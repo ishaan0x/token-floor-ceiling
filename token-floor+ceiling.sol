@@ -4,7 +4,6 @@ pragma solidity ^0.8.0;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/ERC20.sol";
 
-
 // tokenFloorCeiling  
 contract tokenFloorCeiling is Ownable {
     // DAO treasury address
@@ -73,8 +72,9 @@ contract tokenFloorCeiling is Ownable {
     function mint(uint amount) payable public {
         require(govToken.tokenSupply() + amount < maxTokenSupply, "minting too many tokens");
         uint requiredAmount = mintCalculate(amount);
-        require(msg.value > requiredAmount);
+        require(msg.value > requiredAmount); // ensure we receive funds
 
+        // Relay funds to treasury if necessary
         if (treasury != address(this))
         {
              (bool sent, ) = treasury.call{value: requiredAmount}("");
@@ -88,6 +88,7 @@ contract tokenFloorCeiling is Ownable {
         require(govToken.tokenSupply() - amount < minTokenSupply, "burning too many tokens");
 
         _burn(msg.sender, amount);
+        // Send ether to GOV burner
         (bool sent, ) = msg.sender.call{value: burnCalculate(amount)}("");
         require(sent, "Failed to send Ether");
     }
@@ -114,3 +115,19 @@ contract tokenFloorCeiling is Ownable {
                 / (govToken.tokenSupply()**2));
     }
 }
+
+    function mint(uint amount) payable public {
+        uint requiredAmount = mintCalculate(amount);
+        require(msg.value > requiredAmount); // ensure we receive funds
+
+        _mint(msg.sender, amount);
+    }
+
+    function burn(uint amount) public {
+        require(govToken.balanceOf(msg.sender) >= amount, "user does not have enough tokens");
+        
+        _burn(msg.sender, amount);
+        // Send ether to GOV burner
+        (bool sent, ) = msg.sender.call{value: burnCalculate(amount)}("");
+        require(sent, "Failed to send Ether");
+    }
