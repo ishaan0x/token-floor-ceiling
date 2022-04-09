@@ -100,6 +100,7 @@ contract tokenFloorCeiling is Ownable {
     // Calculate how much ETH is required to mint amount of tokens
     function mintCalculate(uint amount) private view returns(uint) {
         return ((10000 + mintDiscountRate)
+                / 10000
                 * ((govToken.tokenSupply() + amount)**2 - govToken.tokenSupply()**2)
                 * treasury.balance
                 / 2
@@ -108,26 +109,11 @@ contract tokenFloorCeiling is Ownable {
 
     // Calculate how much ETH is required to burn amount of tokens
     function burnCalculate(uint amount) private view returns(uint) {
-        return ((10000 + mintDiscountRate)
+        return ((10000 - burnDiscountRate)
+                / 10000
                 * (govToken.tokenSupply()**2 - (govToken.tokenSupply() - amount)**2)
                 * treasury.balance
                 / 2
                 / (govToken.tokenSupply()**2));
     }
 }
-
-    function mint(uint amount) payable public {
-        uint requiredAmount = mintCalculate(amount);
-        require(msg.value > requiredAmount); // ensure we receive funds
-
-        _mint(msg.sender, amount);
-    }
-
-    function burn(uint amount) public {
-        require(govToken.balanceOf(msg.sender) >= amount, "user does not have enough tokens");
-        
-        _burn(msg.sender, amount);
-        // Send ether to GOV burner
-        (bool sent, ) = msg.sender.call{value: burnCalculate(amount)}("");
-        require(sent, "Failed to send Ether");
-    }
