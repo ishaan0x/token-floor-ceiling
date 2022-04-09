@@ -14,7 +14,7 @@ contract tokenFloorCeiling is Ownable {
 
     // Max/min token supply of governance token
     uint maxTokenSupply;
-    uint minTokenSupply;
+    uint minTokenSupply = type(uint).max;
 
     // Denominated in basis points
     uint mintDiscountRate;
@@ -23,12 +23,21 @@ contract tokenFloorCeiling is Ownable {
     ERC20 govToken;
 
     //
-    // PUBLIC, OWNER-ONLY FUNCTIONS
+    // OWNER-ONLY FUNCTIONS
     //
 
-    constructor(address _treasury, address _govToken) {
+    constructor(address _treasury, 
+                address _govToken, 
+                uint _maxTokenSupply, 
+                uint _minTokenSupply, 
+                uint _mintDiscountRate, 
+                uint _burnDiscountRate) {
         setTreasury(_treasury);
-        govToken = ERC20(_govToken);
+        govToken = ERC20(_govToken); // not editable
+        setMaxTokenSupply(_maxTokenSupply);
+        setMinTokenSupply(_minTokenSupply);
+        setMintDiscountRate(_mintDiscountRate);
+        setBurnDiscountRate(_burnDiscountRate);
     }
 
     // Enables owner to change treasyry if needed
@@ -46,26 +55,41 @@ contract tokenFloorCeiling is Ownable {
 
     // Can be more than current token supply; will temporarily disable burning
     function setMinTokenSupply(uint _minTokenSupply) public ownerOnly {
-        minTokenSupply = _minTokenSupply;
+        minTokenSupply = _minTokenSupply;  
+    }
+
+    function setMintDiscountRate(uint _mintDiscountRate) public ownerOnly {
+        mintDiscountRate = _mintDiscountRate;
+    }
+
+    function setBurnDiscountRate(uint _burnDiscountRate) public ownerOnly {
+        burnDiscountRate = _burnDiscountRate;
     }
 
     // 
     // PUBLIC FUNCTIONS
     // 
 
-    function mint(uint amount) public {
+    function mint(uint amount) payable public {
         require(govToken.tokenSupply() + amount < maxTokenSupply, "minting too many tokens");
+        uint requiredAmount = mintCalculate(amount);
+        require(msg.value > requiredAmount);
 
-        govToken.transferFrom(msg.sender, treasury, mintCalculate(amount));
+        if (treasury != address(this))
+        {
+             (bool sent, ) = treasury.call{value: requiredAmount}("");
+            require(sent, "Failed to send Ether");
+        }
         _mint(msg.sender, amount);
     }
 
     function burn(uint amount) public {
         require(govToken.balanceOf(msg.sender) >= amount, "user does not have enough tokens");
-        require(govToken.tokenSupply() - amount < maxTokenSupply, "minting too many tokens");
+        require(govToken.tokenSupply() - amount < minTokenSupply, "burning too many tokens");
 
         _burn(msg.sender, amount);
-        govToken.transferFrom(treasury, msg.sender, burnCalculate(amount));
+        (bool sent, ) = msg.sender.call{value: burnCalculate(amount)}("");
+        require(sent, "Failed to send Ether");
     }
 
     //
