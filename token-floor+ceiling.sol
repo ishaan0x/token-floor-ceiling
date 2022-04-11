@@ -109,9 +109,9 @@ contract tokenFloorCeiling is Ownable {
 
     // Calculate how much ETH is required to burn amount of tokens
     function burnCalculate(uint amount) private view returns(uint) {
-        return ((10000 - burnDiscountRate)
+        return ((10000 + burnDiscountRate)
                 / 10000
-                * (govToken.tokenSupply()**2 - (govToken.tokenSupply() - amount)**2)
+                * ((govToken.tokenSupply() + amount)**2 - govToken.tokenSupply()**2)
                 * treasury.balance
                 / 2
                 / (govToken.tokenSupply()**2));
